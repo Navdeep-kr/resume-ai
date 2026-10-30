@@ -11,22 +11,23 @@ import { ResumeDocument } from '../preview/ResumeDocument';
 import { SAMPLE_PROFILES } from '../../data/sampleProfiles';
 import { parseResumeFile } from '../../services/resumeParser';
 import { getAISettings, saveAISettings, AISettings, aiTailorToJobDescription, JobAnalysisResult } from '../../services/aiService';
+import { exportToPdf, printResume } from '../../services/pdfExport';
+import { exportToDocx } from '../../services/docxExport';
+import confetti from 'canvas-confetti';
 import { 
   User, FileText, Briefcase, GraduationCap, Code, PlusCircle, 
-  ChevronDown, ChevronUp, Sparkles, Upload, ArrowRight, CheckCircle2, 
-  Settings, Bot, HelpCircle, FileCheck, Target, Zap, Eye, SplitSquareVertical
+  ChevronDown, ChevronUp, Sparkles, Upload, CheckCircle2, 
+  Settings, Bot, Target, Zap, Eye, Download, FileDown, Printer
 } from 'lucide-react';
 
 interface Screen1UserDetailsProps {
   resume: ResumeData;
   onChange: (updated: ResumeData) => void;
-  onNavigateToScreen2: () => void;
 }
 
 export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
   resume,
   onChange,
-  onNavigateToScreen2,
 }) => {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     personal: true,
@@ -47,6 +48,7 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
   const [jobDescriptionInput, setJobDescriptionInput] = useState<string>('');
   const [jobAnalysis, setJobAnalysis] = useState<JobAnalysisResult | null>(null);
   const [isAnalyzingJob, setIsAnalyzingJob] = useState<boolean>(false);
+  const [showBottomExportMenu, setShowBottomExportMenu] = useState<boolean>(false);
 
   // Mobile preview modal
   const [showMobilePreviewModal, setShowMobilePreviewModal] = useState<boolean>(false);
@@ -136,6 +138,20 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
       },
     });
     setShowJobModal(false);
+  };
+
+  // Direct Downloads from Bottom Bar
+  const handleDownloadPdf = async () => {
+    setShowBottomExportMenu(false);
+    const fileName = `${(resume.personal.fullName || 'Resume').replace(/\s+/g, '_')}_Resume.pdf`;
+    await exportToPdf('resume-preview-document', fileName, resume.design.pageSettings.pageSize);
+    confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+  };
+
+  const handleDownloadDocx = async () => {
+    setShowBottomExportMenu(false);
+    await exportToDocx(resume);
+    confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
   };
 
   // Calculate completion percentage
@@ -239,16 +255,6 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
               <Eye className="w-3.5 h-3.5" />
               <span>Preview</span>
             </button>
-
-            {/* Direct Screen 2 Button */}
-            <button
-              type="button"
-              onClick={onNavigateToScreen2}
-              className="px-3.5 py-1.5 sm:px-4 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-md shadow-indigo-200 transition inline-flex items-center gap-1.5"
-            >
-              <span>Design Studio</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
           </div>
         </div>
       </header>
@@ -261,7 +267,6 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
         zoomScale={zoomScale}
         onZoomChange={setZoomScale}
         onChange={onChange}
-        onOpenScreen2={onNavigateToScreen2}
       />
 
       {/* 3. MAIN WORKSPACE: SPLIT REAL-TIME OR FULL FORM */}
@@ -535,17 +540,11 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
                 <div className="w-full flex items-center justify-between pb-3 mb-2 border-b border-slate-800 text-xs text-slate-300">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="font-bold text-white tracking-wide">Live Real-Time Preview</span>
-                    <span className="text-[10px] text-slate-400">({resume.design.pageSettings.pageSize})</span>
+                    <span className="font-bold text-white tracking-wide">Live Real-Time Document</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={onNavigateToScreen2}
-                    className="text-[11px] text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1"
-                  >
-                    <span>Full Screen Editor</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </button>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    {resume.design.pageSettings.pageSize} • {resume.design.typography.fontFamily}
+                  </span>
                 </div>
 
                 {/* Scaled Preview Document */}
@@ -569,19 +568,52 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="hidden sm:inline">Live editing active. All changes saved automatically.</span>
+            <span className="hidden sm:inline">All changes saved automatically in private local draft.</span>
             <span className="sm:hidden">Auto-saved.</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="relative">
             <button
               type="button"
-              onClick={onNavigateToScreen2}
+              onClick={() => setShowBottomExportMenu(!showBottomExportMenu)}
               className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 transition flex items-center gap-2 cursor-pointer"
             >
-              <span>CREATE MY RESUME</span>
-              <ArrowRight className="w-4 h-4" />
+              <Download className="w-4 h-4" />
+              <span>Download Resume</span>
+              <ChevronDown className="w-3.5 h-3.5" />
             </button>
+
+            {showBottomExportMenu && (
+              <div className="absolute right-0 bottom-full mb-2 w-52 bg-white border border-slate-200 rounded-xl shadow-2xl py-1.5 z-50 text-slate-700 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  className="w-full px-4 py-2.5 text-left hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2.5 transition"
+                >
+                  <FileDown className="w-4 h-4 text-indigo-600" />
+                  <span>Download PDF (A4/Letter)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadDocx}
+                  className="w-full px-4 py-2.5 text-left hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2.5 transition border-t border-slate-100"
+                >
+                  <FileText className="w-4 h-4 text-blue-600" />
+                  <span>Download DOCX (Word)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBottomExportMenu(false);
+                    printResume();
+                  }}
+                  className="w-full px-4 py-2.5 text-left hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2.5 transition border-t border-slate-100"
+                >
+                  <Printer className="w-4 h-4 text-emerald-600" />
+                  <span>Print Document</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

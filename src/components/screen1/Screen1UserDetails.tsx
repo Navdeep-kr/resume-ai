@@ -9,15 +9,16 @@ import { AdditionalSectionsForm } from './AdditionalSectionsForm';
 import { HeaderDesignToolbar } from './HeaderDesignToolbar';
 import { ResumeDocument } from '../preview/ResumeDocument';
 import { SAMPLE_PROFILES } from '../../data/sampleProfiles';
-import { parseResumeFile } from '../../services/resumeParser';
+import { parseAnyResumeFile } from '../../services/resumeParser';
 import { getAISettings, saveAISettings, AISettings, aiTailorToJobDescription, JobAnalysisResult } from '../../services/aiService';
 import { exportToPdf, printResume } from '../../services/pdfExport';
 import { exportToDocx } from '../../services/docxExport';
 import confetti from 'canvas-confetti';
+import { UniversalImportModal } from '../common/UniversalImportModal';
 import { 
   User, FileText, Briefcase, GraduationCap, Code, PlusCircle, 
   ChevronDown, ChevronUp, Sparkles, Upload, CheckCircle2, 
-  Settings, Bot, Target, Zap, Eye, Download, FileDown, Printer
+  Settings, Bot, Target, Zap, Eye, Download, FileDown, Printer, FileUp
 } from 'lucide-react';
 
 interface Screen1UserDetailsProps {
@@ -49,6 +50,7 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
   const [jobAnalysis, setJobAnalysis] = useState<JobAnalysisResult | null>(null);
   const [isAnalyzingJob, setIsAnalyzingJob] = useState<boolean>(false);
   const [showBottomExportMenu, setShowBottomExportMenu] = useState<boolean>(false);
+  const [showUniversalImportModal, setShowUniversalImportModal] = useState<boolean>(false);
 
   // Mobile preview modal
   const [showMobilePreviewModal, setShowMobilePreviewModal] = useState<boolean>(false);
@@ -92,23 +94,8 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
     if (!file) return;
 
     try {
-      const parsed = await parseResumeFile(file);
-      onChange({
-        ...resume,
-        ...parsed,
-        personal: {
-          ...resume.personal,
-          ...(parsed.personal || {}),
-        },
-        summary: {
-          ...resume.summary,
-          ...(parsed.summary || {}),
-        },
-        experience: parsed.experience || resume.experience,
-        education: parsed.education || resume.education,
-        skills: parsed.skills || resume.skills,
-        lastModified: Date.now(),
-      });
+      const { data: parsed } = await parseAnyResumeFile(file);
+      handleApplyExtractedData(parsed);
       alert(`Successfully imported details from "${file.name}"!`);
     } catch (err) {
       console.error(err);
@@ -138,6 +125,29 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
       },
     });
     setShowJobModal(false);
+  };
+
+  const handleApplyExtractedData = (extracted: Partial<ResumeData>) => {
+    onChange({
+      ...resume,
+      ...extracted,
+      personal: {
+        ...resume.personal,
+        ...(extracted.personal || {}),
+      },
+      summary: {
+        ...resume.summary,
+        ...(extracted.summary || {}),
+      },
+      experience: extracted.experience && extracted.experience.length > 0 ? extracted.experience : resume.experience,
+      education: extracted.education && extracted.education.length > 0 ? extracted.education : resume.education,
+      skills: extracted.skills || resume.skills,
+      additional: {
+        ...resume.additional,
+        ...(extracted.additional || {}),
+      },
+      lastModified: Date.now(),
+    });
   };
 
   // Direct Downloads from Bottom Bar
@@ -209,21 +219,14 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
             </div>
 
             {/* Resume File Import Button */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              accept=".pdf,.docx,.txt,.json"
-              className="hidden"
-            />
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-400 text-slate-700 rounded-lg text-xs font-semibold shadow-2xs transition inline-flex items-center gap-1.5"
-              title="Upload existing resume (PDF, DOCX, or text) to extract details"
+              onClick={() => setShowUniversalImportModal(true)}
+              className="px-3 py-1.5 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold shadow-2xs transition inline-flex items-center gap-1.5"
+              title="Upload existing resume (PDF, Word, TXT, JSON, or any document)"
             >
-              <Upload className="w-3.5 h-3.5 text-indigo-600" />
-              <span className="hidden sm:inline">Import</span>
+              <FileUp className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Import Any File</span>
             </button>
 
             {/* AI Job Tailor Button */}
@@ -267,6 +270,7 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
         zoomScale={zoomScale}
         onZoomChange={setZoomScale}
         onChange={onChange}
+        onOpenImportModal={() => setShowUniversalImportModal(true)}
       />
 
       {/* 3. MAIN WORKSPACE: SPLIT REAL-TIME OR FULL FORM */}
@@ -298,6 +302,33 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
                   />
                 </div>
               </div>
+            </div>
+
+            {/* QUICK IMPORT BANNER CARD */}
+            <div 
+              onClick={() => setShowUniversalImportModal(true)}
+              className="p-4 bg-gradient-to-r from-indigo-50/80 via-white to-purple-50/80 border border-indigo-200/90 hover:border-indigo-400 rounded-2xl cursor-pointer transition flex items-center justify-between gap-4 shadow-2xs group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+                  <FileUp className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                    <span>Import Details From Any File</span>
+                    <span className="px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-700 text-[10px] uppercase font-bold">Auto-Fill</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Upload any PDF, Word (.docx), TXT, RTF, Markdown, or JSON document to extract and edit details immediately.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="px-3.5 py-1.5 bg-white border border-indigo-200 group-hover:border-indigo-400 text-indigo-700 rounded-xl text-xs font-bold shadow-2xs transition flex-shrink-0"
+              >
+                Import File
+              </button>
             </div>
 
             {/* SECTION A: PERSONAL DETAILS */}
@@ -643,6 +674,13 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
           </div>
         </div>
       )}
+
+      {/* UNIVERSAL IMPORT MODAL FOR ANY FILE TYPE */}
+      <UniversalImportModal
+        isOpen={showUniversalImportModal}
+        onClose={() => setShowUniversalImportModal(false)}
+        onApplyData={handleApplyExtractedData}
+      />
 
       {/* AI SETTINGS MODAL */}
       {showAiModal && (

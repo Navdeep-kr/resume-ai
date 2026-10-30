@@ -5,7 +5,7 @@ import { DesignControls } from '../screen2/DesignControls';
 import { 
   Palette, Type, Layers, Eye, Download, 
   Sparkles, Check, ChevronDown, ZoomIn, ZoomOut, SplitSquareVertical,
-  FileDown, FileText, Printer, Sliders, X
+  FileDown, FileText, Printer, Sliders, X, Upload
 } from 'lucide-react';
 import { exportToPdf, printResume } from '../../services/pdfExport';
 import { exportToDocx } from '../../services/docxExport';
@@ -18,6 +18,7 @@ interface HeaderDesignToolbarProps {
   zoomScale: number;
   onZoomChange: (scale: number) => void;
   onChange: (updated: ResumeData) => void;
+  onOpenImportModal?: () => void;
 }
 
 export const HeaderDesignToolbar: React.FC<HeaderDesignToolbarProps> = ({
@@ -27,6 +28,7 @@ export const HeaderDesignToolbar: React.FC<HeaderDesignToolbarProps> = ({
   zoomScale,
   onZoomChange,
   onChange,
+  onOpenImportModal,
 }) => {
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
   const [templateFilter, setTemplateFilter] = useState('All');
@@ -342,6 +344,19 @@ export const HeaderDesignToolbar: React.FC<HeaderDesignToolbarProps> = ({
               <Sliders className="w-3.5 h-3.5 text-indigo-600" />
               <span>More Styles</span>
             </button>
+
+            {/* IMPORT FILE BUTTON */}
+            {onOpenImportModal && (
+              <button
+                type="button"
+                onClick={onOpenImportModal}
+                className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg font-bold flex items-center gap-1.5 transition"
+                title="Import Any File (PDF, Word, TXT, RTF, JSON)"
+              >
+                <Upload className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Import File</span>
+              </button>
+            )}
           </div>
 
           {/* RIGHT: REAL-TIME VIEW MODES & QUICK EXPORT */}

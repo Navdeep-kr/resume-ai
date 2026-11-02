@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ResumeData, SectionKey } from '../../types/resume';
 import { PersonalDetailsForm } from './PersonalDetailsForm';
 import { SummaryForm } from './SummaryForm';
@@ -15,10 +15,13 @@ import { exportToPdf, printResume } from '../../services/pdfExport';
 import { exportToDocx } from '../../services/docxExport';
 import confetti from 'canvas-confetti';
 import { UniversalImportModal } from '../common/UniversalImportModal';
+import { AtsAuditModal } from '../common/AtsAuditModal';
+import { BulletLibraryModal } from '../common/BulletLibraryModal';
 import { 
   User, FileText, Briefcase, GraduationCap, Code, PlusCircle, 
   ChevronDown, ChevronUp, Sparkles, Upload, CheckCircle2, 
-  Settings, Bot, Target, Zap, Eye, Download, FileDown, Printer, FileUp
+  Settings, Bot, Target, Zap, Eye, Download, FileDown, Printer, FileUp,
+  Maximize2, Sun, Moon, Loader2
 } from 'lucide-react';
 
 interface Screen1UserDetailsProps {
@@ -41,7 +44,87 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
 
   // Real-time View Mode: 'split' or 'form'
   const [viewMode, setViewMode] = useState<'split' | 'form'>('split');
-  const [zoomScale, setZoomScale] = useState<number>(0.68);
+  const [zoomScale, setZoomScale] = useState<number>(0.72);
+  const [isAutoFit, setIsAutoFit] = useState<boolean>(true);
+  const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
+
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [windowWidth, setWindowWidth] = useState<number>(
+    typeof window !== 'undefined' ? window.innerWidth : 1200
+  );
+
+  const isA4 = resume.design.pageSettings.pageSize === 'A4';
+  const baseWidthPx = isA4 ? 794 : 816;
+  const minHeightPx = isA4 ? 1123 : 1056;
+
+  // Window resize listener
+  useEffect(() => {
+    const handleWinResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleWinResize);
+    return () => window.removeEventListener('resize', handleWinResize);
+  }, []);
+
+  // Auto-fit calculation based on preview container width
+  const handleRecalculateAutoFit = useCallback(() => {
+    if (!previewContainerRef.current) return;
+    const containerWidth = previewContainerRef.current.clientWidth;
+    if (containerWidth > 120) {
+      const availableWidth = containerWidth - 28;
+      const calculated = Math.min(1.25, Math.max(0.38, availableWidth / baseWidthPx));
+      setZoomScale(parseFloat(calculated.toFixed(2)));
+    }
+  }, [baseWidthPx]);
+
+  useEffect(() => {
+    if (!previewContainerRef.current) return;
+    const observer = new ResizeObserver(() => {
+      if (isAutoFit) {
+        handleRecalculateAutoFit();
+      }
+    });
+    observer.observe(previewContainerRef.current);
+    if (isAutoFit) handleRecalculateAutoFit();
+    return () => observer.disconnect();
+  }, [isAutoFit, handleRecalculateAutoFit, viewMode]);
+
+  const mobileScale = Math.min(0.65, Math.max(0.32, (windowWidth - 28) / baseWidthPx));
+
+  const [showFullScreenPreview, setShowFullScreenPreview] = useState<boolean>(false);
+  const [fullScreenZoom, setFullScreenZoom] = useState<number>(1.0);
+  const [previewTheme, setPreviewTheme] = useState<'light' | 'dark'>('light');
+  const [previewHeightMode, setPreviewHeightMode] = useState<'complete' | 'sticky'>('complete');
+  const [docActualHeight, setDocActualHeight] = useState<number>(minHeightPx);
+
+  // Measure actual rendered scroll height of document to avoid any content cutoff
+  useEffect(() => {
+    const updateActualHeight = () => {
+      const el = document.getElementById('resume-preview-document');
+      if (el && el.scrollHeight > 0) {
+        setDocActualHeight(Math.max(minHeightPx, el.scrollHeight));
+      }
+    };
+    updateActualHeight();
+    const interval = setInterval(updateActualHeight, 500);
+    return () => clearInterval(interval);
+  }, [resume, minHeightPx]);
+
+  const handleFitEntirePageHeight = () => {
+    setIsAutoFit(false);
+    const availableHeight = window.innerHeight - 240;
+    const calculated = Math.min(1.0, Math.max(0.35, availableHeight / docActualHeight));
+    setZoomScale(parseFloat(calculated.toFixed(2)));
+  };
+
+  // Keyboard shortcut: Esc to exit full screen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowFullScreenPreview(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const [selectedSample, setSelectedSample] = useState<string>('');
   const [showAiModal, setShowAiModal] = useState<boolean>(false);
@@ -51,6 +134,9 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
   const [isAnalyzingJob, setIsAnalyzingJob] = useState<boolean>(false);
   const [showBottomExportMenu, setShowBottomExportMenu] = useState<boolean>(false);
   const [showUniversalImportModal, setShowUniversalImportModal] = useState<boolean>(false);
+  const [showAtsAuditModal, setShowAtsAuditModal] = useState<boolean>(false);
+  const [showBulletLibraryModal, setShowBulletLibraryModal] = useState<boolean>(false);
+  const [activeBulletTargetExpId, setActiveBulletTargetExpId] = useState<string | null>(null);
 
   // Mobile preview modal
   const [showMobilePreviewModal, setShowMobilePreviewModal] = useState<boolean>(false);
@@ -150,12 +236,49 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
     });
   };
 
-  // Direct Downloads from Bottom Bar
+  const handleInsertBullet = (bullet: string) => {
+    const formattedBullet = bullet.startsWith('•') ? bullet : `• ${bullet}`;
+    if (activeBulletTargetExpId) {
+      const updatedExp = (resume.experience || []).map(exp => {
+        if (exp.id === activeBulletTargetExpId) {
+          const current = (exp.achievements || '').trim();
+          return {
+            ...exp,
+            achievements: current ? `${current}\n${formattedBullet}` : formattedBullet,
+          };
+        }
+        return exp;
+      });
+      onChange({ ...resume, experience: updatedExp, lastModified: Date.now() });
+    } else if (resume.experience && resume.experience.length > 0) {
+      const updatedExp = resume.experience.map((exp, idx) => {
+        if (idx === 0) {
+          const current = (exp.achievements || '').trim();
+          return {
+            ...exp,
+            achievements: current ? `${current}\n${formattedBullet}` : formattedBullet,
+          };
+        }
+        return exp;
+      });
+      onChange({ ...resume, experience: updatedExp, lastModified: Date.now() });
+    }
+  };
+
+  // Direct Downloads from Bottom Bar and Live Preview Header
   const handleDownloadPdf = async () => {
     setShowBottomExportMenu(false);
-    const fileName = `${(resume.personal.fullName || 'Resume').replace(/\s+/g, '_')}_Resume.pdf`;
-    await exportToPdf('resume-preview-document', fileName, resume.design.pageSettings.pageSize);
-    confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+    setIsExportingPdf(true);
+    try {
+      const fileName = `${(resume.personal.fullName || 'Resume').replace(/\s+/g, '_')}_Resume.pdf`;
+      await exportToPdf('resume-print-document', fileName, resume.design.pageSettings.pageSize);
+      confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+    } catch (err) {
+      console.error('PDF export error:', err);
+      alert('PDF generation encountered an issue. You can also click Print and choose "Save as PDF".');
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   const handleDownloadDocx = async () => {
@@ -177,8 +300,8 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
   return (
     <div className="min-h-screen bg-slate-100/60 pb-28 text-slate-800">
       {/* 1. TOP BRAND APP BAR */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs w-full">
+        <div className="w-full px-3 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 h-16 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-lg shadow-indigo-200 shadow-md">
               R
@@ -271,13 +394,19 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
         onZoomChange={setZoomScale}
         onChange={onChange}
         onOpenImportModal={() => setShowUniversalImportModal(true)}
+        onOpenAtsAudit={() => setShowAtsAuditModal(true)}
+        onOpenBulletLibrary={() => {
+          setActiveBulletTargetExpId(null);
+          setShowBulletLibraryModal(true);
+        }}
+        onOpenFullScreen={() => setShowFullScreenPreview(true)}
       />
 
       {/* 3. MAIN WORKSPACE: SPLIT REAL-TIME OR FULL FORM */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
-        <div className={`grid gap-6 ${viewMode === 'split' ? 'grid-cols-1 lg:grid-cols-12' : 'max-w-4xl mx-auto'}`}>
+      <div className="w-full px-3 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 pt-4 sm:pt-6">
+        <div className={`grid gap-5 lg:gap-6 2xl:gap-8 ${viewMode === 'split' ? 'grid-cols-1 lg:grid-cols-12' : 'max-w-5xl mx-auto'}`}>
           {/* LEFT COLUMN: EDITING DETAILS FORM */}
-          <div className={`${viewMode === 'split' ? 'lg:col-span-7 xl:col-span-6' : 'w-full'} space-y-5`}>
+          <div className={`${viewMode === 'split' ? 'lg:col-span-6 xl:col-span-6 2xl:col-span-5' : 'w-full'} space-y-5`}>
             {/* HERO BANNER & PROGRESS */}
             <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="space-y-0.5">
@@ -443,6 +572,10 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
                     experience={resume.experience || []}
                     targetRole={resume.personal.professionalTitle}
                     onChange={(updated) => onChange({ ...resume, experience: updated, lastModified: Date.now() })}
+                    onOpenBulletLibrary={(expId) => {
+                      setActiveBulletTargetExpId(expId);
+                      setShowBulletLibraryModal(true);
+                    }}
                   />
                 </div>
               )}
@@ -563,30 +696,228 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
             </section>
           </div>
 
-          {/* RIGHT COLUMN: STICKY LIVE REAL-TIME PREVIEW (IN SPLIT VIEW) */}
+          {/* RIGHT COLUMN: REAL-TIME PREVIEW (IN SPLIT VIEW) */}
           {viewMode === 'split' && (
-            <div className="hidden lg:block lg:col-span-5 xl:col-span-6">
-              <div className="sticky top-32 bg-slate-900/90 border border-slate-800 rounded-3xl p-4 shadow-2xl overflow-hidden flex flex-col items-center">
-                {/* Live Preview Header Badge */}
-                <div className="w-full flex items-center justify-between pb-3 mb-2 border-b border-slate-800 text-xs text-slate-300">
-                  <div className="flex items-center gap-2">
+            <div className="hidden lg:block lg:col-span-6 xl:col-span-6 2xl:col-span-7">
+              <div 
+                className={`rounded-3xl p-3 sm:p-4 border transition-all duration-200 flex flex-col items-center ${
+                  previewHeightMode === 'sticky' 
+                    ? 'sticky top-28 max-h-[calc(100vh-130px)] overflow-hidden' 
+                    : 'h-auto overflow-visible'
+                } ${
+                  previewTheme === 'dark' 
+                    ? 'bg-slate-900 border-slate-800 text-white shadow-2xl' 
+                    : 'bg-slate-200/85 border-slate-300/80 text-slate-800 shadow-xl'
+                }`}
+              >
+                {/* Live Preview Header with Controls */}
+                <div 
+                  className={`w-full flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b text-xs flex-shrink-0 ${
+                    previewTheme === 'dark' ? 'border-slate-800 text-slate-300' : 'border-slate-300 text-slate-700'
+                  }`}
+                >
+                  {/* Left: Document info & View mode toggle */}
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="font-bold text-white tracking-wide">Live Real-Time Document</span>
+                    <span className="font-extrabold tracking-tight">Live A4 Resume</span>
+                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md font-mono border ${
+                      previewTheme === 'dark' ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-white text-slate-600 border-slate-200 shadow-2xs'
+                    }`}>
+                      {resume.design.pageSettings.pageSize}
+                    </span>
+
+                    {/* View Height Mode Toggle: Complete Long View vs Sticky Window */}
+                    <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[11px] ml-1">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewHeightMode('complete')}
+                        className={`px-2 py-0.5 rounded font-bold transition ${
+                          previewHeightMode === 'complete' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                        title="Display full complete resume length with all details visible"
+                      >
+                        Complete Long View
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewHeightMode('sticky')}
+                        className={`px-2 py-0.5 rounded font-bold transition ${
+                          previewHeightMode === 'sticky' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                        title="Keep preview fixed in window with internal scroll"
+                      >
+                        Sticky Window
+                      </button>
+                    </div>
                   </div>
-                  <span className="text-[11px] text-slate-400 font-mono">
-                    {resume.design.pageSettings.pageSize} • {resume.design.typography.fontFamily}
-                  </span>
+
+                  {/* Right Actions: PRINT, DOWNLOAD, ZOOM & FULL VIEW */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {/* PRIMARY ACTION: TAKE A PRINT OUT */}
+                    <button
+                      type="button"
+                      onClick={() => printResume()}
+                      className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-950 text-white rounded-lg font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer hover:shadow-md active:scale-95"
+                      title="Print Resume or Save to PDF via Browser Print Dialog"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Print</span>
+                    </button>
+
+                    {/* PRIMARY ACTION: DOWNLOAD PDF */}
+                    <button
+                      type="button"
+                      onClick={handleDownloadPdf}
+                      disabled={isExportingPdf}
+                      className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-70 text-white rounded-lg font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer hover:shadow-md active:scale-95"
+                      title="Download Clean High-Resolution PDF"
+                    >
+                      {isExportingPdf ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FileDown className="w-3.5 h-3.5" />
+                          <span>PDF</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* DOWNLOAD DOCX */}
+                    <button
+                      type="button"
+                      onClick={handleDownloadDocx}
+                      className="px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-xs transition flex items-center gap-1 cursor-pointer hover:shadow-md active:scale-95"
+                      title="Download Editable Word Document (.docx)"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span className="hidden xl:inline">Word</span>
+                    </button>
+
+                    {/* Zoom & Scale Suite */}
+                    <div className={`flex items-center gap-1 px-1 py-0.5 rounded-lg border text-xs ${
+                      previewTheme === 'dark' ? 'bg-slate-800/90 border-slate-700/80' : 'bg-white border-slate-300/90 shadow-2xs'
+                    }`}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAutoFit(false);
+                          setZoomScale(prev => Math.max(0.35, parseFloat((prev - 0.05).toFixed(2))));
+                        }}
+                        className="px-1 text-slate-500 hover:text-slate-900 font-black text-sm leading-none"
+                        title="Zoom Out"
+                      >
+                        −
+                      </button>
+                      <span className="font-mono font-bold text-[11px] w-9 text-center">
+                        {Math.round(zoomScale * 100)}%
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAutoFit(false);
+                          setZoomScale(prev => Math.min(1.3, parseFloat((prev + 0.05).toFixed(2))));
+                        }}
+                        className="px-1 text-slate-500 hover:text-slate-900 font-black text-sm leading-none"
+                        title="Zoom In"
+                      >
+                        +
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAutoFit(false);
+                          setZoomScale(1.0);
+                        }}
+                        className={`ml-1 text-[10px] px-1.5 py-0.5 rounded font-bold transition ${
+                          zoomScale === 1.0 ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                        title="View at 100% full physical size"
+                      >
+                        100%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleFitEntirePageHeight}
+                        className="text-[10px] px-1.5 py-0.5 rounded font-bold text-slate-500 hover:text-slate-900 transition"
+                        title="Fit entire document height in view"
+                      >
+                        Fit Page
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAutoFit(true);
+                          handleRecalculateAutoFit();
+                        }}
+                        className={`text-[10px] px-1.5 py-0.5 rounded font-bold transition ${
+                          isAutoFit ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                        title="Auto-Fit width to panel"
+                      >
+                        Auto
+                      </button>
+                    </div>
+
+                    {/* Canvas Theme Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setPreviewTheme(prev => prev === 'light' ? 'dark' : 'light')}
+                      className={`p-1.5 rounded-lg border transition ${
+                        previewTheme === 'dark' 
+                          ? 'bg-slate-800 hover:bg-slate-700 text-amber-400 border-slate-700' 
+                          : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-300 shadow-2xs'
+                      }`}
+                      title={previewTheme === 'light' ? 'Switch to Dark Canvas' : 'Switch to Light Desk Canvas'}
+                    >
+                      {previewTheme === 'light' ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
+                    </button>
+
+                    {/* Fullscreen View Button */}
+                    <button
+                      type="button"
+                      onClick={() => setShowFullScreenPreview(true)}
+                      className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold border border-slate-200 transition"
+                      title="Open Fullscreen Document Viewer"
+                    >
+                      <Maximize2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Scaled Preview Document */}
                 <div 
-                  className="w-full flex justify-center overflow-hidden transition-transform duration-100 origin-top"
-                  style={{
-                    transform: `scale(${zoomScale})`,
-                    marginBottom: `-${(1 - zoomScale) * 850}px`,
-                  }}
+                  ref={previewContainerRef}
+                  className={`w-full flex justify-center items-start py-3 px-1 ${
+                    previewHeightMode === 'sticky' ? 'flex-1 overflow-y-auto overflow-x-auto custom-scrollbar' : 'overflow-x-auto overflow-y-visible'
+                  }`}
                 >
-                  <ResumeDocument resume={resume} scale={zoomScale} />
+                  <div
+                    style={{
+                      width: `${Math.round(baseWidthPx * zoomScale)}px`,
+                      minHeight: `${Math.round(docActualHeight * zoomScale)}px`,
+                      position: 'relative',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${baseWidthPx}px`,
+                        transform: `scale(${zoomScale})`,
+                        transformOrigin: 'top left',
+                      }}
+                      className="shadow-2xl shadow-slate-900/15 ring-1 ring-slate-900/10 rounded-xs bg-white"
+                    >
+                      <ResumeDocument 
+                        resume={resume} 
+                        scale={zoomScale} 
+                        containerId="resume-preview-document" 
+                        idPrefix="preview-" 
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -596,7 +927,7 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
 
       {/* STICKY BOTTOM ACTION BAR */}
       <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200 p-4 z-40 shadow-lg">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+        <div className="w-full px-3 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="hidden sm:inline">All changes saved automatically in private local draft.</span>
@@ -651,24 +982,186 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
 
       {/* MOBILE PREVIEW MODAL */}
       {showMobilePreviewModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/90 backdrop-blur-xs flex flex-col justify-end lg:hidden">
-          <div className="bg-slate-900 rounded-t-3xl h-[90vh] flex flex-col shadow-2xl overflow-hidden text-white">
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-              <h3 className="font-bold text-sm flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                Live Resume Preview
-              </h3>
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex flex-col justify-end lg:hidden">
+          <div className="bg-slate-100 rounded-t-3xl h-[92vh] flex flex-col shadow-2xl overflow-hidden text-slate-900 w-full border-t border-slate-300">
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0 bg-white shadow-2xs">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <h3 className="font-extrabold text-sm text-slate-900">
+                  A4 Resume Preview
+                </h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono">
+                  {resume.design.pageSettings.pageSize}
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowMobilePreviewModal(false)}
-                className="text-xs font-bold text-slate-400 hover:text-white p-1"
+                className="text-xs font-bold text-slate-500 hover:text-slate-900 px-2 py-1 bg-slate-100 rounded-lg"
               >
                 ✕ Close
               </button>
             </div>
-            <div className="flex-1 overflow-auto p-4 flex justify-center items-start">
-              <div style={{ transform: 'scale(0.55)', transformOrigin: 'top center', marginBottom: '-400px' }}>
-                <ResumeDocument resume={resume} scale={0.55} />
+            <div className="flex-1 overflow-y-auto overflow-x-auto p-3 sm:p-5 flex justify-center items-start bg-slate-200/80">
+              <div
+                style={{
+                  width: `${Math.round(baseWidthPx * mobileScale)}px`,
+                  minHeight: `${Math.round(minHeightPx * mobileScale)}px`,
+                  position: 'relative',
+                  flexShrink: 0,
+                }}
+              >
+                <div
+                  style={{
+                    width: `${baseWidthPx}px`,
+                    transform: `scale(${mobileScale})`,
+                    transformOrigin: 'top left',
+                  }}
+                  className="shadow-2xl shadow-slate-900/15 ring-1 ring-slate-900/10 rounded-xs bg-white"
+                >
+                  <ResumeDocument 
+                    resume={resume} 
+                    scale={mobileScale} 
+                    containerId="resume-mobile-document" 
+                    idPrefix="mobile-" 
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FULL-SIZE A4 DOCUMENT VIEWER MODAL */}
+      {showFullScreenPreview && (
+        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex flex-col">
+          {/* Top Fullscreen Control Bar */}
+          <div className="h-16 bg-white border-b border-slate-200 px-4 sm:px-8 flex items-center justify-between gap-4 flex-shrink-0 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                A4
+              </div>
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                  <span>Full Size A4 Paper Document</span>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Live 1:1 View
+                  </span>
+                </h3>
+                <p className="text-[11px] text-slate-500 hidden sm:block">
+                  A4 Paper Dimensions (210 × 297 mm) • {resume.personal.fullName || 'Resume'}
+                </p>
+              </div>
+            </div>
+
+            {/* Center Zoom Controls */}
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+              <button
+                type="button"
+                onClick={() => setFullScreenZoom(prev => Math.max(0.4, parseFloat((prev - 0.1).toFixed(2))))}
+                className="w-7 h-7 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg transition font-black text-sm"
+                title="Zoom Out"
+              >
+                −
+              </button>
+              <span className="font-mono font-bold w-12 text-center text-slate-800">
+                {Math.round(fullScreenZoom * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={() => setFullScreenZoom(prev => Math.min(1.5, parseFloat((prev + 0.1).toFixed(2))))}
+                className="w-7 h-7 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg transition font-black text-sm"
+                title="Zoom In"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                onClick={() => setFullScreenZoom(1.0)}
+                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
+                  fullScreenZoom === 1.0 ? 'bg-indigo-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-white'
+                }`}
+                title="View at exact 100% true A4 physical size"
+              >
+                100% (A4)
+              </button>
+              <button
+                type="button"
+                onClick={() => setFullScreenZoom(0.85)}
+                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
+                  fullScreenZoom === 0.85 ? 'bg-indigo-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-white'
+                }`}
+                title="Fit to Page Height"
+              >
+                Fit Page
+              </button>
+            </div>
+
+            {/* Right Action Buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={isExportingPdf}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-70 text-white rounded-lg text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                title="Download Clean High-Resolution PDF"
+              >
+                {isExportingPdf ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileDown className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">PDF</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => printResume()}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                title="Print Resume or Save to PDF via Browser Print Dialog"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Print</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowFullScreenPreview(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition font-bold text-sm"
+                title="Exit Fullscreen (Esc)"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          {/* Fullscreen Document Canvas (Clean Light Studio Desk) */}
+          <div className="flex-1 overflow-auto bg-slate-200/80 p-6 sm:p-10 flex justify-center items-start custom-scrollbar">
+            <div
+              style={{
+                width: `${Math.round(baseWidthPx * fullScreenZoom)}px`,
+                minHeight: `${Math.round(minHeightPx * fullScreenZoom)}px`,
+                position: 'relative',
+                flexShrink: 0,
+              }}
+            >
+              <div
+                style={{
+                  width: `${baseWidthPx}px`,
+                  transform: `scale(${fullScreenZoom})`,
+                  transformOrigin: 'top left',
+                }}
+                className="shadow-2xl shadow-slate-900/20 ring-1 ring-slate-900/10 rounded-xs bg-white"
+              >
+                <ResumeDocument 
+                  resume={resume} 
+                  scale={fullScreenZoom} 
+                  containerId="resume-modal-document" 
+                  idPrefix="modal-" 
+                />
               </div>
             </div>
           </div>
@@ -680,6 +1173,20 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
         isOpen={showUniversalImportModal}
         onClose={() => setShowUniversalImportModal(false)}
         onApplyData={handleApplyExtractedData}
+      />
+
+      {/* ATS SCORE & QUALITY AUDIT REPORT MODAL */}
+      <AtsAuditModal
+        isOpen={showAtsAuditModal}
+        onClose={() => setShowAtsAuditModal(false)}
+        resume={resume}
+      />
+
+      {/* ACTION BULLETS LIBRARY MODAL */}
+      <BulletLibraryModal
+        isOpen={showBulletLibraryModal}
+        onClose={() => setShowBulletLibraryModal(false)}
+        onInsertBullet={handleInsertBullet}
       />
 
       {/* AI SETTINGS MODAL */}
@@ -852,6 +1359,14 @@ export const Screen1UserDetails: React.FC<Screen1UserDetailsProps> = ({
           </div>
         </div>
       )}
+      {/* DEDICATED PRINT & EXPORT DOCUMENT ROOT (Hidden on screen via .resume-print-only, active exclusively in native print and PDF export) */}
+      <div id="resume-print-root" className="resume-print-only" aria-hidden="true">
+        <ResumeDocument 
+          resume={resume} 
+          containerId="resume-print-document" 
+          idPrefix="print-" 
+        />
+      </div>
     </div>
   );
 };

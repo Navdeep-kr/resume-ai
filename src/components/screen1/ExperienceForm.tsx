@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { WorkExperienceItem } from '../../types/resume';
 import { 
   Briefcase, Plus, Trash2, ArrowUp, ArrowDown, Sparkles, 
-  RefreshCw, CheckCircle2, ChevronDown, ChevronUp, Calendar, MapPin, Building
+  RefreshCw, CheckCircle2, ChevronDown, ChevronUp, Calendar, MapPin, Building, BookOpen
 } from 'lucide-react';
 import { aiImproveText } from '../../services/aiService';
 
@@ -10,12 +10,14 @@ interface ExperienceFormProps {
   experience: WorkExperienceItem[];
   targetRole?: string;
   onChange: (updated: WorkExperienceItem[]) => void;
+  onOpenBulletLibrary?: (expId: string) => void;
 }
 
 export const ExperienceForm: React.FC<ExperienceFormProps> = ({
   experience,
   targetRole,
   onChange,
+  onOpenBulletLibrary,
 }) => {
   const [expandedId, setExpandedId] = useState<string | null>(experience[0]?.id || null);
   const [aiLoadingKey, setAiLoadingKey] = useState<string | null>(null);
@@ -327,19 +329,32 @@ export const ExperienceForm: React.FC<ExperienceFormProps> = ({
                         <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                           Key Achievements & Measurable Results (Bullet points)
                         </label>
-                        <button
-                          type="button"
-                          disabled={aiLoadingKey === `${exp.id}-achievements`}
-                          onClick={() => handleAiAction(exp.id, 'achievements')}
-                          className="px-2 py-0.5 text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 rounded transition flex items-center gap-1"
-                        >
-                          {aiLoadingKey === `${exp.id}-achievements` ? (
-                            <RefreshCw className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <Sparkles className="w-3 h-3" />
+                        <div className="flex items-center gap-1.5">
+                          {onOpenBulletLibrary && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenBulletLibrary(exp.id)}
+                              className="px-2 py-0.5 text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded transition flex items-center gap-1 shadow-2xs"
+                              title="Browse 100+ high-impact bullet templates with metrics"
+                            >
+                              <BookOpen className="w-3 h-3 text-indigo-600" />
+                              Action Bullets
+                            </button>
                           )}
-                          AI Strengthen & Quantify
-                        </button>
+                          <button
+                            type="button"
+                            disabled={aiLoadingKey === `${exp.id}-achievements`}
+                            onClick={() => handleAiAction(exp.id, 'achievements')}
+                            className="px-2 py-0.5 text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 rounded transition flex items-center gap-1 shadow-2xs"
+                          >
+                            {aiLoadingKey === `${exp.id}-achievements` ? (
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Sparkles className="w-3 h-3" />
+                            )}
+                            AI Strengthen
+                          </button>
+                        </div>
                       </div>
                       <textarea
                         rows={4}

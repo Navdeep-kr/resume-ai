@@ -26,10 +26,31 @@
   background: #94a3b8;
 }
 
+/* Custom sleek scrollbar for dark preview container */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.5);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.8);
+}
+
+/* Screen: hide dedicated print root */
+.resume-print-only {
+  display: none !important;
+}
+
 /* High Fidelity Print Styles */
 @media print {
   @page {
-    margin: 8mm;
+    margin: 0;
     size: auto;
   }
   
@@ -38,37 +59,86 @@
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
-  }
-
-  header, aside, .no-print, button, .fixed {
-    display: none !important;
-  }
-
-  main {
-    background: transparent !important;
-    padding: 0 !important;
-    margin: 0 !important;
+    height: auto !important;
     overflow: visible !important;
   }
 
-  #resume-preview-document {
-    box-shadow: none !important;
-    border: none !important;
+  /* Hide all UI elements, toolbars, forms, and backgrounds */
+  body * {
+    visibility: hidden;
+  }
+
+  header, aside, .no-print, button, nav, footer, .page-boundary-guide, form, input, select, textarea {
+    display: none !important;
+  }
+
+  /* Exclusively display the dedicated print root and its children */
+  .resume-print-only,
+  .resume-print-only * {
+    visibility: visible !important;
+  }
+
+  .resume-print-only {
+    display: block !important;
+    position: static !important;
+    left: 0 !important;
+    top: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
     min-height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
+    background: #ffffff !important;
+    transform: none !important;
+  }
+
+  .resume-print-only #resume-print-document {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .resume-print-only .resume-page {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 auto !important;
+    padding: 12mm 15mm !important;
+    background: #ffffff !important;
     transform: none !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    min-height: 290mm !important;
+  }
+
+  .resume-print-only .resume-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  /* Fallback if printing directly from preview */
+  #resume-preview-document,
+  #resume-preview-document * {
+    visibility: visible !important;
   }
 
   /* Prevent awkward page breaks inside experience and education cards */
   .relative.group, 
   div[key^="exp-"], 
   div[key^="edu-"], 
-  div[key^="proj-"] {
+  div[key^="proj-"],
+  article,
+  section {
     page-break-inside: avoid;
     break-inside: avoid;
   }

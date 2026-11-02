@@ -5,10 +5,11 @@ import { DesignControls } from '../screen2/DesignControls';
 import { 
   Palette, Type, Layers, Eye, Download, 
   Sparkles, Check, ChevronDown, ZoomIn, ZoomOut, SplitSquareVertical,
-  FileDown, FileText, Printer, Sliders, X, Upload
+  FileDown, FileText, Printer, Sliders, X, Upload, BookOpen, Zap, Maximize2
 } from 'lucide-react';
 import { exportToPdf, printResume } from '../../services/pdfExport';
 import { exportToDocx } from '../../services/docxExport';
+import { auditResumeForAts } from '../../services/atsAuditService';
 import confetti from 'canvas-confetti';
 
 interface HeaderDesignToolbarProps {
@@ -19,6 +20,9 @@ interface HeaderDesignToolbarProps {
   onZoomChange: (scale: number) => void;
   onChange: (updated: ResumeData) => void;
   onOpenImportModal?: () => void;
+  onOpenAtsAudit?: () => void;
+  onOpenBulletLibrary?: () => void;
+  onOpenFullScreen?: () => void;
 }
 
 export const HeaderDesignToolbar: React.FC<HeaderDesignToolbarProps> = ({
@@ -29,6 +33,9 @@ export const HeaderDesignToolbar: React.FC<HeaderDesignToolbarProps> = ({
   onZoomChange,
   onChange,
   onOpenImportModal,
+  onOpenAtsAudit,
+  onOpenBulletLibrary,
+  onOpenFullScreen,
 }) => {
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
   const [templateFilter, setTemplateFilter] = useState('All');
@@ -38,6 +45,7 @@ export const HeaderDesignToolbar: React.FC<HeaderDesignToolbarProps> = ({
 
   const { design } = resume;
   const currentTemplate = TEMPLATES.find(t => t.id === design.templateId) || TEMPLATES[0];
+  const atsReport = auditResumeForAts(resume);
 
   const COLOR_SWATCHES = [
     { name: 'Indigo Modern', color: '#4f46e5' },
@@ -137,13 +145,33 @@ export const HeaderDesignToolbar: React.FC<HeaderDesignToolbarProps> = ({
     });
   };
 
+  const handleFitToOnePage = () => {
+    onChange({
+      ...resume,
+      design: {
+        ...resume.design,
+        typography: {
+          ...resume.design.typography,
+          fontSize: 'small',
+          lineSpacing: 'tight',
+        },
+        layout: {
+          ...resume.design.layout,
+          pagePadding: 'compact',
+          sectionSpacing: 'compact',
+        },
+      },
+      lastModified: Date.now(),
+    });
+  };
+
   // Quick Export
   const handleQuickDownloadPdf = async () => {
     setIsExporting(true);
     setShowExportMenu(false);
     try {
       const fileName = `${(resume.personal.fullName || 'Resume').replace(/\s+/g, '_')}_Resume.pdf`;
-      await exportToPdf('resume-preview-document', fileName, resume.design.pageSettings.pageSize);
+      await exportToPdf('resume-print-document', fileName, resume.design.pageSettings.pageSize);
       confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
     } catch (e) {
       alert('PDF generation error. You can also use the print dialog.');
@@ -172,8 +200,8 @@ export const HeaderDesignToolbar: React.FC<HeaderDesignToolbarProps> = ({
 
   return (
     <>
-      <div className="bg-white border-b border-slate-200 shadow-xs sticky top-16 z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white border-b border-slate-200 shadow-xs sticky top-16 z-20 w-full">
+        <div className="w-full px-3 sm:px-6 lg:px-8 2xl:px-12 py-2 flex flex-wrap items-center justify-between gap-2.5">
           {/* LEFT: TEMPLATE, COLOR, FONT CONTROLS */}
           <div className="flex flex-wrap items-center gap-3 text-xs">
             {/* TEMPLATE PICKER */}
@@ -338,19 +366,43 @@ export const HeaderDesignToolbar: React.FC<HeaderDesignToolbarProps> = ({
             <button
               type="button"
               onClick={() => setShowMoreStylesDrawer(true)}
-              className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-bold flex items-center gap-1.5 transition"
+              className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-bold flex items-center gap-1.5 transition text-xs shadow-2xs"
               title="More Layout, Bullet & Heading Styles"
             >
               <Sliders className="w-3.5 h-3.5 text-indigo-600" />
               <span>More Styles</span>
             </button>
 
+            {/* 1-CLICK FIT TO 1 PAGE */}
+            <button
+              type="button"
+              onClick={handleFitToOnePage}
+              className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg font-bold flex items-center gap-1.5 transition text-xs shadow-2xs"
+              title="1-Click Fit to 1 Page: Automatically tightens font size, line spacing and margins to keep your resume on a single page"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
+              <span className="hidden sm:inline">Fit to 1 Page</span>
+            </button>
+
+            {/* ACTION BULLETS LIBRARY */}
+            {onOpenBulletLibrary && (
+              <button
+                type="button"
+                onClick={onOpenBulletLibrary}
+                className="px-2.5 py-1.5 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg font-bold flex items-center gap-1.5 transition text-xs shadow-2xs"
+                title="Browse 100+ high-impact pre-written action bullets across Tech, Management, Finance, etc."
+              >
+                <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+                <span className="hidden sm:inline">Bullets Library</span>
+              </button>
+            )}
+
             {/* IMPORT FILE BUTTON */}
             {onOpenImportModal && (
               <button
                 type="button"
                 onClick={onOpenImportModal}
-                className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg font-bold flex items-center gap-1.5 transition"
+                className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg font-bold flex items-center gap-1.5 transition text-xs shadow-2xs"
                 title="Import Any File (PDF, Word, TXT, RTF, JSON)"
               >
                 <Upload className="w-3.5 h-3.5 text-indigo-600" />
@@ -361,6 +413,27 @@ export const HeaderDesignToolbar: React.FC<HeaderDesignToolbarProps> = ({
 
           {/* RIGHT: REAL-TIME VIEW MODES & QUICK EXPORT */}
           <div className="flex items-center gap-2">
+            {/* LIVE ATS SCORE & AUDIT BADGE */}
+            {onOpenAtsAudit && (
+              <button
+                type="button"
+                onClick={onOpenAtsAudit}
+                className={`px-2.5 py-1 rounded-lg border font-bold flex items-center gap-1.5 transition text-xs shadow-2xs ${
+                  atsReport.score >= 80 
+                    ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : atsReport.score >= 60
+                    ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+                    : 'bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-300'
+                }`}
+                title="Click to view ATS Score breakdown, power verbs detected, and resume improvements"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                <span>ATS {atsReport.score}%</span>
+                <span className="text-[10px] uppercase px-1.5 py-0.5 bg-white/90 rounded font-black shadow-2xs text-slate-800">
+                  {atsReport.grade}
+                </span>
+              </button>
+            )}
             {/* VIEW MODE TOGGLE (Split Real-Time View vs Form Only) */}
             <div className="hidden md:flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
               <button
@@ -390,25 +463,38 @@ export const HeaderDesignToolbar: React.FC<HeaderDesignToolbarProps> = ({
               </button>
             </div>
 
+            {/* FULL SIZE A4 VIEW BUTTON */}
+            {onOpenFullScreen && (
+              <button
+                type="button"
+                onClick={onOpenFullScreen}
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold transition flex items-center gap-1.5 text-xs border border-slate-200 shadow-2xs"
+                title="Open 100% Full-Size A4 Document Preview"
+              >
+                <Maximize2 className="w-3.5 h-3.5 text-indigo-600" />
+                <span className="hidden sm:inline">Full Size A4</span>
+              </button>
+            )}
+
             {/* Quick Zoom for split view */}
             {viewMode === 'split' && (
-              <div className="hidden xl:flex items-center gap-1 bg-slate-50 border border-slate-200 px-1.5 py-1 rounded-lg text-[11px] text-slate-500">
+              <div className="hidden lg:flex items-center gap-1 bg-slate-50 border border-slate-200 px-1.5 py-1 rounded-lg text-[11px] text-slate-600">
                 <button
                   type="button"
-                  onClick={() => onZoomChange(Math.max(0.4, zoomScale - 0.05))}
-                  className="p-0.5 hover:text-slate-800"
-                  title="Zoom Out"
+                  onClick={() => onZoomChange(Math.max(0.35, parseFloat((zoomScale - 0.05).toFixed(2))))}
+                  className="p-0.5 hover:text-slate-900 transition"
+                  title="Zoom Out (35% min)"
                 >
-                  <ZoomOut className="w-3 h-3" />
+                  <ZoomOut className="w-3.5 h-3.5" />
                 </button>
-                <span className="font-mono font-bold w-9 text-center">{Math.round(zoomScale * 100)}%</span>
+                <span className="font-mono font-bold w-10 text-center">{Math.round(zoomScale * 100)}%</span>
                 <button
                   type="button"
-                  onClick={() => onZoomChange(Math.min(0.9, zoomScale + 0.05))}
-                  className="p-0.5 hover:text-slate-800"
-                  title="Zoom In"
+                  onClick={() => onZoomChange(Math.min(1.3, parseFloat((zoomScale + 0.05).toFixed(2))))}
+                  className="p-0.5 hover:text-slate-900 transition"
+                  title="Zoom In (130% max)"
                 >
-                  <ZoomIn className="w-3 h-3" />
+                  <ZoomIn className="w-3.5 h-3.5" />
                 </button>
               </div>
             )}

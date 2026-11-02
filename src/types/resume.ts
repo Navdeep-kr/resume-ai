@@ -257,9 +257,14 @@ export interface LayoutSettings {
   sidebarWidth: number; // percentage, e.g. 33
   margins: 'compact' | 'normal' | 'spacious';
   pagePadding: 'compact' | 'normal' | 'spacious';
+  sectionSpacing?: 'compact' | 'normal' | 'relaxed';
   bulletStyle: 'disc' | 'circle' | 'square' | 'dash' | 'arrow' | 'diamond';
   dividerStyle: 'solid' | 'dashed' | 'dotted' | 'double' | 'gradient' | 'none';
   sectionHeadingStyle: 'clean' | 'underlined' | 'filled' | 'pill' | 'bordered' | 'uppercase-accent' | 'left-bar';
+  showIcons?: boolean;
+  showInitialsAvatar?: boolean;
+  skillStyle?: 'tags' | 'dots' | 'bars' | 'minimal';
+  showPageBreakGuide?: boolean;
 }
 
 export interface PageSettings {
@@ -289,6 +294,7 @@ export interface ResumeData {
   additional: AdditionalSections;
   sectionOrder: SectionKey[];
   hiddenSections: SectionKey[];
+  sectionTitles?: Record<string, string>;
   design: DesignSettings;
 }
 

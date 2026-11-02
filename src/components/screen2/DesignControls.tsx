@@ -608,6 +608,83 @@ export const DesignControls: React.FC<DesignControlsProps> = ({
                 ))}
               </div>
             </div>
+
+            {/* Section Spacing */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-800 mb-1.5">
+                Section Spacing Density
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['compact', 'normal', 'relaxed'] as const).map(spacing => (
+                  <button
+                    key={spacing}
+                    type="button"
+                    onClick={() => updateDesign({ layout: { ...layout, sectionSpacing: spacing } })}
+                    className={`py-1.5 text-xs font-bold capitalize rounded-lg border transition ${
+                      (layout.sectionSpacing || 'normal') === spacing
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {spacing}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Skill Visual Style */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-800 mb-1.5">
+                Skills Display Style
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { key: 'tags', label: '🏷️ Badges' },
+                  { key: 'dots', label: '●●● Dots' },
+                  { key: 'bars', label: '📊 Bars' },
+                ].map(style => (
+                  <button
+                    key={style.key}
+                    type="button"
+                    onClick={() => updateDesign({ layout: { ...layout, skillStyle: style.key as any } })}
+                    className={`py-1.5 text-xs font-bold rounded-lg border transition ${
+                      (layout.skillStyle || 'tags') === style.key
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {style.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Visual Guides & Polish */}
+            <div className="pt-2 border-t border-slate-100 space-y-2.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-800">
+                Visual Guides & Elements
+              </label>
+              
+              <label className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-100 transition">
+                <span className="text-xs font-semibold text-slate-700">Show 1-Page Boundary Guide</span>
+                <input
+                  type="checkbox"
+                  checked={layout.showPageBreakGuide !== false}
+                  onChange={(e) => updateDesign({ layout: { ...layout, showPageBreakGuide: e.target.checked } })}
+                  className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-100 transition">
+                <span className="text-xs font-semibold text-slate-700">Show Monogram Avatar (When no photo)</span>
+                <input
+                  type="checkbox"
+                  checked={layout.showInitialsAvatar !== false}
+                  onChange={(e) => updateDesign({ layout: { ...layout, showInitialsAvatar: e.target.checked } })}
+                  className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                />
+              </label>
+            </div>
           </div>
         )}
 

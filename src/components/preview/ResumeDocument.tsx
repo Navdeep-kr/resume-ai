@@ -10,12 +10,16 @@ interface ResumeDocumentProps {
   resume: ResumeData;
   scale?: number;
   isPrintMode?: boolean;
+  containerId?: string;
+  idPrefix?: string;
 }
 
 export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
   resume,
   scale = 1,
   isPrintMode = false,
+  containerId,
+  idPrefix = '',
 }) => {
   const { personal, summary, experience, education, skills, additional, design, sectionOrder, hiddenSections } = resume;
   const { colorScheme, typography, layout, pageSettings, templateId } = design;
@@ -32,6 +36,11 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
   // Letter ratio: 8.5in x 11in. In px at 96 DPI: ~816px x ~1056px.
   const baseWidthPx = isA4 ? 794 : 816;
   const minHeightPx = isA4 ? 1123 : 1056;
+
+  // Section Spacing gap
+  const sectionSpacingClass = 
+    layout.sectionSpacing === 'compact' ? 'mb-4' :
+    layout.sectionSpacing === 'relaxed' ? 'mb-8' : 'mb-6';
 
   // Padding & Margin scale
   const paddingMap = {
@@ -92,6 +101,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
   // Section Heading Formatter
   const renderSectionHeading = (title: string, icon?: React.ReactNode) => {
     const headingStyle = layout.sectionHeadingStyle || 'underlined';
+    const displayIcon = layout.showIcons !== false ? icon : null;
     const fontStyle = {
       fontFamily: typography.headingFont || typography.fontFamily,
       letterSpacing: typography.letterSpacing === 'wide' ? '0.05em' : 'normal',
@@ -103,7 +113,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
           className="px-3 py-1.5 rounded mb-3 flex items-center gap-2 font-semibold text-white uppercase text-xs tracking-wider"
           style={{ backgroundColor: colorScheme.primary, ...fontStyle }}
         >
-          {icon}
+          {displayIcon}
           <span>{title}</span>
         </div>
       );
@@ -120,7 +130,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
               ...fontStyle
             }}
           >
-            {icon}
+            {displayIcon}
             {title}
           </span>
           <div className="flex-1 h-px" style={{ backgroundColor: colorScheme.divider }} />
@@ -138,7 +148,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
             ...fontStyle 
           }}
         >
-          {icon}
+          {displayIcon}
           <span className={headingSizeMap[typography.fontSize]}>{title}</span>
         </div>
       );
@@ -155,7 +165,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
           }}
         >
           <div className="flex items-center gap-2">
-            {icon}
+            {displayIcon}
             <span className={headingSizeMap[typography.fontSize]}>{title}</span>
           </div>
           <span className="w-8 h-1" style={{ backgroundColor: colorScheme.primary }} />
@@ -170,7 +180,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
             className="flex items-center gap-2 font-bold uppercase tracking-widest text-xs"
             style={{ color: colorScheme.primary, ...fontStyle }}
           >
-            {icon}
+            {displayIcon}
             <span>{title}</span>
           </div>
           <div className="h-0.5 w-12 mt-1" style={{ backgroundColor: colorScheme.primary }} />
@@ -184,7 +194,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
           className="mb-3 font-semibold uppercase tracking-wider flex items-center gap-2"
           style={{ color: colorScheme.headings, ...fontStyle }}
         >
-          {icon}
+          {displayIcon}
           <span className={headingSizeMap[typography.fontSize]}>{title}</span>
         </div>
       );
@@ -201,7 +211,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
             ...fontStyle 
           }}
         >
-          {icon}
+          {displayIcon}
           <span className={headingSizeMap[typography.fontSize]}>{title}</span>
         </div>
       </div>
@@ -211,27 +221,66 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
   // Section checks
   const isVisible = (key: SectionKey) => !hiddenSections.includes(key);
 
-  // Photo element
-  const renderPhoto = () => {
-    if (!personal.photoUrl) return null;
-    const shapeClass = 
-      personal.photoShape === 'circle' ? 'rounded-full' :
-      personal.photoShape === 'square' ? 'rounded-none' : 'rounded-2xl';
+  // Photo or Designer Monogram Initials Avatar
+  const renderAvatarOrMonogram = (isBannerTextWhite: boolean = false) => {
+    if (personal.photoUrl) {
+      const shapeClass = 
+        personal.photoShape === 'circle' ? 'rounded-full' :
+        personal.photoShape === 'square' ? 'rounded-none' : 'rounded-2xl';
 
-    return (
-      <div className="flex-shrink-0">
-        <img
-          src={personal.photoUrl}
-          alt={personal.fullName}
-          className={`object-cover border-2 shadow-sm ${shapeClass}`}
-          style={{
-            width: `${personal.photoSize || 90}px`,
-            height: `${personal.photoSize || 90}px`,
-            borderColor: colorScheme.primary,
-          }}
-        />
-      </div>
-    );
+      return (
+        <div className="flex-shrink-0">
+          <img
+            src={personal.photoUrl}
+            alt={personal.fullName}
+            className={`object-cover border-2 shadow-sm ${shapeClass}`}
+            style={{
+              width: `${personal.photoSize || 85}px`,
+              height: `${personal.photoSize || 85}px`,
+              borderColor: colorScheme.primary,
+            }}
+          />
+        </div>
+      );
+    }
+
+    // Monogram Initials Badge
+    if (layout.showInitialsAvatar !== false && personal.fullName?.trim()) {
+      const initials = personal.fullName
+        .replace(/^(dr\.|mr\.|ms\.|mrs\.|prof\.)\s+/i, '')
+        .trim()
+        .split(/\s+/)
+        .map(w => w[0])
+        .filter(Boolean)
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
+
+      const shapeClass = 
+        personal.photoShape === 'circle' ? 'rounded-full' :
+        personal.photoShape === 'square' ? 'rounded-xl' : 'rounded-2xl';
+
+      return (
+        <div className="flex-shrink-0 select-none">
+          <div 
+            className={`flex items-center justify-center font-extrabold shadow-xs border-2 ${shapeClass}`}
+            style={{
+              width: `${personal.photoSize || 80}px`,
+              height: `${personal.photoSize || 80}px`,
+              backgroundColor: isBannerTextWhite ? 'rgba(255, 255, 255, 0.2)' : colorScheme.sectionHighlight || '#f1f5f9',
+              borderColor: isBannerTextWhite ? '#ffffff' : colorScheme.primary,
+              color: isBannerTextWhite ? '#ffffff' : colorScheme.primary,
+              fontSize: `${(personal.photoSize || 80) * 0.38}px`,
+              fontFamily: typography.headingFont || typography.fontFamily,
+            }}
+          >
+            {initials}
+          </div>
+        </div>
+      );
+    }
+
+    return null;
   };
 
   // Contact info items
@@ -298,7 +347,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
     if (!summary.professionalSummary && !summary.careerObjective && (!summary.careerHighlights || summary.careerHighlights.length === 0)) return null;
 
     return (
-      <div key="sec-summary" className="mb-6">
+      <div key="sec-summary" className={sectionSpacingClass}>
         {renderSectionHeading('Professional Summary', <User className="w-4 h-4" />)}
         {summary.professionalSummary && (
           <p className="whitespace-pre-line text-justify leading-relaxed">
@@ -336,7 +385,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
     const isTimelineTemplate = templateId === 'timeline-express';
 
     return (
-      <div key="sec-experience" className="mb-6">
+      <div key="sec-experience" className={sectionSpacingClass}>
         {renderSectionHeading('Work Experience', <Briefcase className="w-4 h-4" />)}
         <div className={`space-y-5 ${isTimelineTemplate ? 'border-l-2 pl-4 ml-1 relative' : ''}`} style={isTimelineTemplate ? { borderColor: colorScheme.primary } : undefined}>
           {experience.map((exp, idx) => {
@@ -398,7 +447,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
     if (!education || education.length === 0) return null;
 
     return (
-      <div key="sec-education" className="mb-6">
+      <div key="sec-education" className={sectionSpacingClass}>
         {renderSectionHeading('Education', <GraduationCap className="w-4 h-4" />)}
         <div className="space-y-4">
           {education.map((edu, idx) => {
@@ -449,29 +498,70 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
     const hasAnySkill = (technical?.length || 0) + (professional?.length || 0) + (soft?.length || 0) + (industrySpecific?.length || 0) > 0;
     if (!hasAnySkill) return null;
 
+    const skillStyle = layout.skillStyle || 'tags';
+
     return (
-      <div key="sec-skills" className="mb-6">
+      <div key="sec-skills" className={sectionSpacingClass}>
         {renderSectionHeading('Skills & Competencies', <Code className="w-4 h-4" />)}
         
-        <div className="space-y-2.5 text-xs">
+        <div className="space-y-3 text-xs">
           {technical && technical.length > 0 && (
             <div>
               <span className="font-semibold block mb-1" style={{ color: colorScheme.headings }}>Technical Skills</span>
-              <div className="flex flex-wrap gap-1.5">
-                {technical.map((s, i) => (
-                  <span 
-                    key={i} 
-                    className="px-2 py-0.5 rounded font-medium border text-xs"
-                    style={{ 
-                      backgroundColor: colorScheme.sectionHighlight,
-                      borderColor: colorScheme.divider,
-                      color: colorScheme.headings 
-                    }}
-                  >
-                    {s}
-                  </span>
-                ))}
-              </div>
+              {skillStyle === 'dots' ? (
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                  {technical.map((s, i) => (
+                    <div key={i} className="flex items-center justify-between py-0.5">
+                      <span className="font-medium text-slate-800 truncate pr-1">{s}</span>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {[1, 2, 3, 4, 5].map(d => (
+                          <span 
+                            key={d} 
+                            className={`w-1.5 h-1.5 rounded-full ${d <= (i % 2 === 0 ? 5 : 4) ? '' : 'opacity-25'}`}
+                            style={{ backgroundColor: colorScheme.primary }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : skillStyle === 'bars' ? (
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                  {technical.map((s, i) => (
+                    <div key={i} className="space-y-0.5">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="font-medium truncate">{s}</span>
+                        <span className="opacity-60">{i % 3 === 0 ? 'Advanced' : 'Proficient'}</span>
+                      </div>
+                      <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full rounded-full" 
+                          style={{ 
+                            width: `${i % 3 === 0 ? 95 : (i % 2 === 0 ? 88 : 80)}%`, 
+                            backgroundColor: colorScheme.primary 
+                          }} 
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {technical.map((s, i) => (
+                    <span 
+                      key={i} 
+                      className="px-2.5 py-0.5 rounded-md font-medium border text-xs shadow-2xs"
+                      style={{ 
+                        backgroundColor: colorScheme.sectionHighlight,
+                        borderColor: colorScheme.divider,
+                        color: colorScheme.headings 
+                      }}
+                    >
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -482,7 +572,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
                 {professional.map((s, i) => (
                   <span 
                     key={i} 
-                    className="px-2 py-0.5 rounded font-medium border text-xs"
+                    className="px-2.5 py-0.5 rounded-md font-medium border text-xs shadow-2xs"
                     style={{ 
                       backgroundColor: colorScheme.sectionHighlight,
                       borderColor: colorScheme.divider,
@@ -520,7 +610,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
     if (!additional.projects || additional.projects.length === 0) return null;
 
     return (
-      <div key="sec-projects" className="mb-6">
+      <div key="sec-projects" className={sectionSpacingClass}>
         {renderSectionHeading('Projects', <Code className="w-4 h-4" />)}
         <div className="space-y-3.5">
           {additional.projects.map((proj, idx) => (
@@ -577,7 +667,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
     if (!additional.certifications || additional.certifications.length === 0) return null;
 
     return (
-      <div key="sec-certifications" className="mb-6">
+      <div key="sec-certifications" className={sectionSpacingClass}>
         {renderSectionHeading('Certifications', <Award className="w-4 h-4" />)}
         <ul className="space-y-2 text-xs">
           {additional.certifications.map((cert, idx) => (
@@ -602,7 +692,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
     if (!additional.awards || additional.awards.length === 0) return null;
 
     return (
-      <div key="sec-awards" className="mb-6">
+      <div key="sec-awards" className={sectionSpacingClass}>
         {renderSectionHeading('Honors & Awards', <Award className="w-4 h-4" />)}
         <div className="space-y-2 text-xs">
           {additional.awards.map((award, idx) => (
@@ -625,18 +715,38 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
     if (!isVisible('languages')) return null;
     if (!additional.languages || additional.languages.length === 0) return null;
 
+    const fluencyDots: Record<string, number> = {
+      'Native': 5,
+      'Fluent': 4,
+      'Professional': 4,
+      'Conversational': 3,
+      'Basic': 2,
+    };
+
     return (
-      <div key="sec-languages" className="mb-6">
+      <div key="sec-languages" className={sectionSpacingClass}>
         {renderSectionHeading('Languages', <Globe className="w-4 h-4" />)}
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          {additional.languages.map((l, idx) => (
-            <div key={l.id || idx} className="flex justify-between items-center py-0.5 border-b" style={{ borderColor: colorScheme.divider }}>
-              <span className="font-semibold" style={{ color: colorScheme.headings }}>{l.language}</span>
-              <span className="text-[11px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: colorScheme.sectionHighlight, color: colorScheme.primary }}>
-                {l.proficiency}
-              </span>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 gap-2.5 text-xs">
+          {additional.languages.map((l, idx) => {
+            const dots = fluencyDots[l.proficiency] || 3;
+            return (
+              <div key={l.id || idx} className="flex justify-between items-center py-1 border-b" style={{ borderColor: colorScheme.divider }}>
+                <span className="font-semibold" style={{ color: colorScheme.headings }}>{l.language}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] opacity-75">{l.proficiency}</span>
+                  <div className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map(d => (
+                      <span 
+                        key={d} 
+                        className={`w-1.5 h-1.5 rounded-full ${d <= dots ? '' : 'opacity-25'}`}
+                        style={{ backgroundColor: colorScheme.primary }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -648,7 +758,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
     if (!additional.internships || additional.internships.length === 0) return null;
 
     return (
-      <div key="sec-internships" className="mb-6">
+      <div key="sec-internships" className={sectionSpacingClass}>
         {renderSectionHeading('Internships', <Briefcase className="w-4 h-4" />)}
         <div className="space-y-3 text-xs">
           {additional.internships.map((intern, idx) => (
@@ -671,7 +781,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
     if (!additional.publications || additional.publications.length === 0) return null;
 
     return (
-      <div key="sec-publications" className="mb-6">
+      <div key="sec-publications" className={sectionSpacingClass}>
         {renderSectionHeading('Publications', <BookOpen className="w-4 h-4" />)}
         <div className="space-y-2 text-xs">
           {additional.publications.map((pub, idx) => (
@@ -692,7 +802,7 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
     if (!additional.licenses || additional.licenses.length === 0) return null;
 
     return (
-      <div key="sec-licenses" className="mb-6">
+      <div key="sec-licenses" className={sectionSpacingClass}>
         {renderSectionHeading('Licenses & Credentials', <CheckCircle2 className="w-4 h-4" />)}
         <div className="space-y-2 text-xs">
           {additional.licenses.map((lic, idx) => (
@@ -744,110 +854,363 @@ export const ResumeDocument: React.FC<ResumeDocumentProps> = ({
   const isTwoColumn = layout.layoutType === 'two-column' || layout.layoutType === 'sidebar-left' || layout.layoutType === 'sidebar-right' || templateId === 'nordic-split' || templateId === 'sidebar-dark' || templateId === 'tech-innovator';
   const sidebarIsLeft = layout.layoutType === 'sidebar-left' || templateId === 'nordic-split' || templateId === 'sidebar-dark';
 
-  const sidebarSections: SectionKey[] = ['skills', 'education', 'certifications', 'languages', 'licenses', 'awards'];
-  const mainSections: SectionKey[] = sectionOrder.filter(s => !sidebarSections.includes(s));
+  // Accurate section height estimator for high-density, gap-free page budgeting
+  const getSectionEstimatedHeight = (key: SectionKey): number => {
+    if (!isVisible(key)) return 0;
+    switch (key) {
+      case 'summary': {
+        if (!summary.professionalSummary && !summary.careerObjective && !summary.careerHighlights?.length) return 0;
+        let h = 36; // heading
+        if (summary.professionalSummary) {
+          h += Math.max(34, Math.ceil(summary.professionalSummary.length / 85) * 16);
+        }
+        if (summary.careerObjective) {
+          h += Math.max(24, Math.ceil(summary.careerObjective.length / 85) * 16 + 10);
+        }
+        if (summary.careerHighlights?.length) {
+          h += 20 + summary.careerHighlights.length * 20;
+        }
+        return h + 18;
+      }
+      case 'experience': {
+        if (!experience || experience.length === 0) return 0;
+        let h = 36; // heading
+        experience.forEach(exp => {
+          h += 38; // job title, company, dates
+          if (exp.responsibilities) {
+            h += Math.max(20, Math.ceil(exp.responsibilities.length / 90) * 16);
+          }
+          if (exp.achievements) {
+            const lines = exp.achievements.split('\n').filter(Boolean);
+            h += lines.length * 20;
+          }
+          h += 14;
+        });
+        return h + 16;
+      }
+      case 'education': {
+        if (!education || education.length === 0) return 0;
+        let h = 36; // heading
+        education.forEach(edu => {
+          h += 36; // degree, school, dates
+          if (edu.fieldOfStudy || edu.gpa) h += 16;
+          if (edu.description) h += Math.max(14, Math.ceil(edu.description.length / 90) * 14);
+          h += 10;
+        });
+        return h + 16;
+      }
+      case 'skills': {
+        if (!skills.technical?.length && !skills.professional?.length && !skills.soft?.length && !skills.industrySpecific?.length) return 0;
+        let h = 36; // heading
+        if (skills.technical?.length) {
+          h += 16 + Math.ceil(skills.technical.length / 4) * 26;
+        }
+        if (skills.professional?.length) {
+          h += 16 + Math.ceil(skills.professional.length / 4) * 26;
+        }
+        if (skills.soft?.length) {
+          h += 22;
+        }
+        if (skills.industrySpecific?.length) {
+          h += 22;
+        }
+        return h + 16;
+      }
+      case 'certifications': {
+        if (!additional.certifications?.length) return 0;
+        return 36 + additional.certifications.length * 30 + 16;
+      }
+      case 'awards': {
+        if (!additional.awards?.length) return 0;
+        return 36 + additional.awards.length * 32 + 16;
+      }
+      case 'projects': {
+        if (!additional.projects?.length) return 0;
+        let h = 36;
+        additional.projects.forEach(p => {
+          h += 38;
+          if (p.description) h += Math.max(16, Math.ceil(p.description.length / 90) * 15);
+          if (p.technologies?.length) h += 20;
+          h += 8;
+        });
+        return h + 16;
+      }
+      case 'languages': {
+        if (!additional.languages?.length) return 0;
+        return 36 + Math.ceil(additional.languages.length / 2) * 24 + 16;
+      }
+      case 'internships': {
+        if (!additional.internships?.length) return 0;
+        return 36 + additional.internships.length * 50 + 16;
+      }
+      case 'publications': {
+        if (!additional.publications?.length) return 0;
+        return 36 + additional.publications.length * 42 + 16;
+      }
+      case 'licenses': {
+        if (!additional.licenses?.length) return 0;
+        return 36 + additional.licenses.length * 30 + 16;
+      }
+      default:
+        return 0;
+    }
+  };
+
+  // Estimate total content height to determine if multi-page separation is needed
+  const visibleSections = sectionOrder.filter(k => isVisible(k) && getSectionEstimatedHeight(k) > 0);
+  const totalContentHeight = visibleSections.reduce((sum, k) => sum + getSectionEstimatedHeight(k), 0);
+  const headerEstimatedHeight = (personal.photoUrl || layout.showInitialsAvatar !== false) ? 175 : 135;
+  const totalDocHeightWithHeader = headerEstimatedHeight + totalContentHeight;
+
+  // Decide whether multi-page separation is triggered
+  const isMultiPage = 
+    pageSettings.maxPages === '2-page' || 
+    (pageSettings.maxPages !== '1-page' && totalDocHeightWithHeader > 880);
+
+  // Dynamic Greedy-Fill: Fill Page 1 to maximum comfortable capacity without awkward white gaps
+  let page1Sections: SectionKey[] = [];
+  let page2Sections: SectionKey[] = [];
+
+  if (isMultiPage) {
+    // Capacity for Page 1 content (1123px total A4 minus padding, header, and footer)
+    const page1Capacity = layout.pagePadding === 'compact' ? 890 : layout.pagePadding === 'spacious' ? 810 : 850;
+    let accumulatedHeight = 0;
+    let hasOverflowed = false;
+
+    for (const key of visibleSections) {
+      const secH = getSectionEstimatedHeight(key);
+      // Keep adding sections to Page 1 in sequence as long as they comfortably fit
+      if (!hasOverflowed && (page1Sections.length === 0 || (accumulatedHeight + secH <= page1Capacity))) {
+        page1Sections.push(key);
+        accumulatedHeight += secH;
+      } else {
+        hasOverflowed = true;
+        page2Sections.push(key);
+      }
+    }
+
+    // Safety fallback: If everything ended up on Page 1 and user didn't force 2-page, treat as 1-page
+    if (page2Sections.length === 0 && pageSettings.maxPages !== '2-page') {
+      page1Sections = [...visibleSections];
+      page2Sections = [];
+    } else if (page2Sections.length === 0 && pageSettings.maxPages === '2-page') {
+      const mid = Math.max(1, Math.floor(page1Sections.length / 2));
+      page2Sections = page1Sections.slice(mid);
+      page1Sections = page1Sections.slice(0, mid);
+    }
+  } else {
+    page1Sections = [...visibleSections];
+    page2Sections = [];
+  }
+
+  // Two-column section partitioning
+  const p1Sidebar: SectionKey[] = isMultiPage 
+    ? ['skills', 'education'].filter(k => isVisible(k))
+    : ['skills', 'education', 'certifications', 'languages', 'licenses', 'awards'].filter(k => isVisible(k));
+  const p1Main: SectionKey[] = isMultiPage
+    ? ['summary', 'experience'].filter(k => isVisible(k))
+    : sectionOrder.filter(s => isVisible(s) && !p1Sidebar.includes(s));
+
+  const p2Sidebar: SectionKey[] = isMultiPage
+    ? ['certifications', 'languages', 'licenses', 'awards'].filter(k => isVisible(k))
+    : [];
+  const p2Main: SectionKey[] = isMultiPage
+    ? sectionOrder.filter(s => isVisible(s) && !p1Sidebar.includes(s) && !p1Main.includes(s) && !p2Sidebar.includes(s))
+    : [];
 
   // Top Banner Template variant
   const isTopBanner = templateId === 'top-banner-bold';
   const isAccentFrame = templateId === 'accent-left-border';
 
-  return (
-    <div
-      id="resume-preview-document"
-      className={`mx-auto bg-white shadow-xl transition-all duration-200 ${paddingMap[layout.pagePadding || 'normal']} ${lineSpacingMap[typography.lineSpacing || 'normal']} ${letterSpacingMap[typography.letterSpacing || 'normal']} ${fontSizeMap[typography.fontSize || 'medium']}`}
-      style={{
-        width: `${baseWidthPx}px`,
-        minHeight: `${minHeightPx}px`,
-        ...fontFamilyStyle,
-        backgroundColor: colorScheme.background || '#ffffff',
-        borderLeft: isAccentFrame ? `8px solid ${colorScheme.primary}` : undefined,
-      }}
-    >
-      {/* TOP BANNER VARIANT */}
-      {isTopBanner ? (
-        <div 
-          className="-mx-8 sm:-mx-12 -mt-8 sm:-mt-12 p-8 sm:p-10 mb-8 text-white flex flex-col sm:flex-row items-center gap-6 justify-between shadow-md"
-          style={{ backgroundColor: colorScheme.primary }}
-        >
-          <div className="text-center sm:text-left flex-1">
-            <h1 
-              className={`font-black uppercase tracking-tight ${nameSizeMap[typography.fontSize]}`}
-              style={{ fontFamily: typography.nameFont || typography.fontFamily }}
-            >
-              {personal.fullName || 'Your Name'}
-            </h1>
-            {personal.professionalTitle && (
-              <p className="text-base sm:text-lg font-medium opacity-90 mt-1">
-                {personal.professionalTitle}
-              </p>
-            )}
-            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs opacity-90 text-white">
-              {renderContactInfo('row', '#ffffff')}
-            </div>
-          </div>
-          {personal.photoUrl && renderPhoto()}
-        </div>
-      ) : (
-        /* STANDARD OR TWO-COLUMN HEADER */
-        <header className="mb-6 pb-4 border-b flex flex-col sm:flex-row items-center justify-between gap-6" style={{ borderColor: colorScheme.divider }}>
-          <div className="text-center sm:text-left flex-1">
-            <h1
-              className={`font-black tracking-tight ${nameSizeMap[typography.fontSize]}`}
-              style={{
-                fontFamily: typography.nameFont || typography.fontFamily,
-                color: colorScheme.headings,
-              }}
-            >
-              {personal.fullName || 'Your Name'}
-            </h1>
-            {personal.professionalTitle && (
-              <p 
-                className="text-base sm:text-lg font-semibold mt-0.5 tracking-wide"
-                style={{ color: colorScheme.primary }}
-              >
-                {personal.professionalTitle}
-              </p>
-            )}
-            <div className="mt-3">
-              {renderContactInfo('row')}
-            </div>
-          </div>
-          {personal.photoUrl && renderPhoto()}
-        </header>
-      )}
+  const pageContainerClass = `resume-page relative mx-auto bg-white shadow-xl transition-all duration-200 flex flex-col justify-between ${
+    paddingMap[layout.pagePadding || 'normal']
+  } ${lineSpacingMap[typography.lineSpacing || 'normal']} ${
+    letterSpacingMap[typography.letterSpacing || 'normal']
+  } ${fontSizeMap[typography.fontSize || 'medium']}`;
 
-      {/* DOCUMENT BODY: TWO-COLUMN vs SINGLE-COLUMN */}
-      {isTwoColumn ? (
-        <div className={`grid grid-cols-12 gap-8 ${sidebarIsLeft ? '' : ''}`}>
-          {/* Sidebar */}
-          <aside 
-            className={`col-span-12 md:col-span-4 p-4 rounded-lg space-y-6 ${sidebarIsLeft ? 'order-1 md:order-1' : 'order-2 md:order-2'}`}
-            style={{ 
-              backgroundColor: templateId === 'sidebar-dark' ? '#0f172a' : colorScheme.sidebar || '#f8fafc',
-              color: templateId === 'sidebar-dark' ? '#f1f5f9' : colorScheme.bodyText,
+  const pageBaseStyle = {
+    width: `${baseWidthPx}px`,
+    minHeight: `${minHeightPx}px`,
+    ...fontFamilyStyle,
+    backgroundColor: colorScheme.background || '#ffffff',
+    borderLeft: isAccentFrame ? `8px solid ${colorScheme.primary}` : undefined,
+  };
+
+  const renderPrimaryHeader = () => (
+    isTopBanner ? (
+      <div 
+        className="-mx-8 sm:-mx-12 -mt-8 sm:-mt-12 p-8 sm:p-10 mb-8 text-white flex flex-col sm:flex-row items-center gap-6 justify-between shadow-md"
+        style={{ backgroundColor: colorScheme.primary }}
+      >
+        <div className="text-center sm:text-left flex-1">
+          <h1 
+            className={`font-black uppercase tracking-tight ${nameSizeMap[typography.fontSize]}`}
+            style={{ fontFamily: typography.nameFont || typography.fontFamily }}
+          >
+            {personal.fullName || 'Your Name'}
+          </h1>
+          {personal.professionalTitle && (
+            <p className="text-base sm:text-lg font-medium opacity-90 mt-1">
+              {personal.professionalTitle}
+            </p>
+          )}
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs opacity-90 text-white">
+            {renderContactInfo('row', '#ffffff')}
+          </div>
+        </div>
+        {renderAvatarOrMonogram(true)}
+      </div>
+    ) : (
+      <header className="mb-6 pb-4 border-b flex flex-col sm:flex-row items-center justify-between gap-6" style={{ borderColor: colorScheme.divider }}>
+        <div className="text-center sm:text-left flex-1">
+          <h1
+            className={`font-black tracking-tight ${nameSizeMap[typography.fontSize]}`}
+            style={{
+              fontFamily: typography.nameFont || typography.fontFamily,
+              color: colorScheme.headings,
             }}
           >
-            {sidebarSections.map(key => isVisible(key) && renderSectionByKey(key))}
-          </aside>
-
-          {/* Main Column */}
-          <main className={`col-span-12 md:col-span-8 ${sidebarIsLeft ? 'order-2 md:order-2' : 'order-1 md:order-1'}`}>
-            {mainSections.map(key => isVisible(key) && renderSectionByKey(key))}
-          </main>
+            {personal.fullName || 'Your Name'}
+          </h1>
+          {personal.professionalTitle && (
+            <p 
+              className="text-base sm:text-lg font-semibold mt-0.5 tracking-wide"
+              style={{ color: colorScheme.primary }}
+            >
+              {personal.professionalTitle}
+            </p>
+          )}
+          <div className="mt-3">
+            {renderContactInfo('row')}
+          </div>
         </div>
-      ) : (
-        /* SINGLE COLUMN */
-        <main>
-          {sectionOrder.map(key => isVisible(key) && renderSectionByKey(key))}
-        </main>
-      )}
+        {renderAvatarOrMonogram()}
+      </header>
+    )
+  );
 
-      {/* FOOTER PAGINATION */}
-      {pageSettings.showPageNumbers && (
-        <footer className="mt-12 pt-4 border-t flex justify-between items-center text-[11px] opacity-50" style={{ borderColor: colorScheme.divider }}>
-          <span>{personal.fullName || 'Resume'} — Confidential</span>
-          <span>Page 1 of 1</span>
-        </footer>
+  const renderContinuationHeader = (pageNumber: number, totalPages: number) => (
+    <header className="mb-6 pb-3 border-b flex items-center justify-between text-xs" style={{ borderColor: colorScheme.divider }}>
+      <div className="flex items-center gap-2">
+        <span 
+          className="font-extrabold tracking-tight text-sm"
+          style={{
+            fontFamily: typography.nameFont || typography.fontFamily,
+            color: colorScheme.headings,
+          }}
+        >
+          {personal.fullName || 'Resume'}
+        </span>
+        {personal.professionalTitle && (
+          <span className="text-slate-400 font-medium">
+            • {personal.professionalTitle}
+          </span>
+        )}
+      </div>
+      <span 
+        className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border"
+        style={{
+          backgroundColor: colorScheme.sectionHighlight || '#f1f5f9',
+          color: colorScheme.primary,
+          borderColor: colorScheme.divider,
+        }}
+      >
+        Page {pageNumber} of {totalPages}
+      </span>
+    </header>
+  );
+
+  const renderFooter = (pageNumber: number, totalPages: number) => {
+    if (!pageSettings.showPageNumbers) return null;
+    return (
+      <footer 
+        className="mt-auto pt-4 border-t flex justify-between items-center text-[11px] opacity-60"
+        style={{ borderColor: colorScheme.divider }}
+      >
+        <span>{personal.fullName || 'Resume'} — Confidential</span>
+        <span>Page {pageNumber} of {totalPages}</span>
+      </footer>
+    );
+  };
+
+  return (
+    <div id={containerId || "resume-preview-document"} className="w-full flex flex-col items-center">
+      {/* PAGE 1 */}
+      <div
+        id={`${idPrefix}resume-page-1`}
+        className={pageContainerClass}
+        style={pageBaseStyle}
+      >
+        <div>
+          {renderPrimaryHeader()}
+          {isTwoColumn ? (
+            <div className={`grid grid-cols-12 gap-8 ${sidebarIsLeft ? '' : ''}`}>
+              <aside 
+                className={`col-span-12 md:col-span-4 p-4 rounded-lg space-y-6 ${sidebarIsLeft ? 'order-1 md:order-1' : 'order-2 md:order-2'}`}
+                style={{ 
+                  backgroundColor: templateId === 'sidebar-dark' ? '#0f172a' : colorScheme.sidebar || '#f8fafc',
+                  color: templateId === 'sidebar-dark' ? '#f1f5f9' : colorScheme.bodyText,
+                }}
+              >
+                {p1Sidebar.map(key => renderSectionByKey(key))}
+              </aside>
+              <main className={`col-span-12 md:col-span-8 ${sidebarIsLeft ? 'order-2 md:order-2' : 'order-1 md:order-1'}`}>
+                {p1Main.map(key => renderSectionByKey(key))}
+              </main>
+            </div>
+          ) : (
+            <main>
+              {page1Sections.map(key => renderSectionByKey(key))}
+            </main>
+          )}
+        </div>
+        {renderFooter(1, isMultiPage ? 2 : 1)}
+      </div>
+
+      {/* SEPARATE PAGE 2 (If multi-page) */}
+      {isMultiPage && (
+        <>
+          {/* Desk Visual Gap Separator (Hidden in print and PDF) */}
+          <div className="no-print my-8 flex items-center justify-center gap-3 select-none">
+            <div className="h-px bg-slate-300 w-24" />
+            <span className="px-3 py-1 bg-white border border-slate-300 rounded-full text-[11px] font-bold text-slate-600 shadow-2xs flex items-center gap-1.5">
+              <span>📄</span>
+              <span>Page 2 of 2</span>
+            </span>
+            <div className="h-px bg-slate-300 w-24" />
+          </div>
+
+          <div
+            id={`${idPrefix}resume-page-2`}
+            className={pageContainerClass}
+            style={pageBaseStyle}
+          >
+            <div>
+              {renderContinuationHeader(2, 2)}
+              {isTwoColumn ? (
+                <div className={`grid grid-cols-12 gap-8 ${sidebarIsLeft ? '' : ''}`}>
+                  <aside 
+                    className={`col-span-12 md:col-span-4 p-4 rounded-lg space-y-6 ${sidebarIsLeft ? 'order-1 md:order-1' : 'order-2 md:order-2'}`}
+                    style={{ 
+                      backgroundColor: templateId === 'sidebar-dark' ? '#0f172a' : colorScheme.sidebar || '#f8fafc',
+                      color: templateId === 'sidebar-dark' ? '#f1f5f9' : colorScheme.bodyText,
+                    }}
+                  >
+                    {p2Sidebar.map(key => renderSectionByKey(key))}
+                  </aside>
+                  <main className={`col-span-12 md:col-span-8 ${sidebarIsLeft ? 'order-2 md:order-2' : 'order-1 md:order-1'}`}>
+                    {p2Main.map(key => renderSectionByKey(key))}
+                  </main>
+                </div>
+              ) : (
+                <main>
+                  {page2Sections.map(key => renderSectionByKey(key))}
+                </main>
+              )}
+            </div>
+            {renderFooter(2, 2)}
+          </div>
+        </>
       )}
     </div>
   );
